@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ZoteroAnnotation {
     pub item_id: i64,
     pub ann_type: i32,
@@ -11,7 +11,7 @@ pub struct ZoteroAnnotation {
     pub sort_index: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ZoteroChildNote {
     pub item_id: i64,
     pub html_content: String,
