@@ -34,6 +34,21 @@ pub struct Cli {
     /// Increase verbosity (-v, -vv, -vvv)
     #[arg(short, long, global = true, action = clap::ArgAction::Count)]
     pub verbose: u8,
+
+    /// Use LLM fallback for unmatched annotations (requires 'llm' feature)
+    #[cfg(feature = "llm")]
+    #[arg(long, global = true)]
+    pub llm_fallback: bool,
+
+    /// LLM model name (e.g. "gpt-4o-mini")
+    #[cfg(feature = "llm")]
+    #[arg(long, global = true, default_value = "gpt-4o-mini")]
+    pub llm_model: String,
+
+    /// LLM API base URL
+    #[cfg(feature = "llm")]
+    #[arg(long, global = true, default_value = "https://api.openai.com/v1", env = "LLM_BASE_URL")]
+    pub llm_base_url: String,
 }
 
 #[derive(Subcommand, Debug)]
