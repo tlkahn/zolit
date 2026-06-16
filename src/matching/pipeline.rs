@@ -7,7 +7,7 @@ use crate::matching::fuzzy::{
 };
 use crate::matching::normalize::{normalize, ocr_normalize};
 use crate::matching::page_scope::{
-    build_paragraphs_ocr, find_page_ranges, page_scoped_line_range, PageRange,
+    build_paragraphs_ocr, page_scoped_line_range, PageRange,
 };
 
 /// Find the line index where `needle` best matches within `lines`.
