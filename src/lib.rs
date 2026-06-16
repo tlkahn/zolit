@@ -3,6 +3,8 @@ pub mod companion;
 pub mod dsl;
 pub mod error;
 pub mod html;
+#[cfg(feature = "llm")]
+pub mod llm_fallback;
 pub mod manifest;
 pub mod matching;
 pub mod pipeline;
