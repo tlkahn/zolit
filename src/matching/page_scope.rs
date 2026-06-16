@@ -93,7 +93,7 @@ pub(crate) fn rejoin_paragraph_hyphens(text: &str) -> String {
             // Check: hyphen followed by space, then lowercase ASCII letter
             if i + 2 < chars.len()
                 && chars[i + 1] == ' '
-                && chars[i + 2].is_ascii_lowercase()
+                && chars[i + 2].is_lowercase()
             {
                 // Skip the hyphen and space, continue with the lowercase letter
                 i += 2;

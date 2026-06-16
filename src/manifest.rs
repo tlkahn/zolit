@@ -31,7 +31,13 @@ fn manifest_path(md_dir: &Path) -> PathBuf {
 pub fn read_manifest(md_dir: &Path) -> ZoteroSyncManifest {
     let path = manifest_path(md_dir);
     match std::fs::read_to_string(&path) {
-        Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
+        Ok(content) => match serde_json::from_str(&content) {
+            Ok(m) => m,
+            Err(e) => {
+                tracing::warn!(path = %path.display(), error = %e, "manifest is corrupt, starting fresh");
+                ZoteroSyncManifest::default()
+            }
+        },
         Err(_) => ZoteroSyncManifest::default(),
     }
 }

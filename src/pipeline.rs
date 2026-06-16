@@ -15,7 +15,6 @@ use crate::matching::page_scope::find_page_ranges;
 use crate::matching::pipeline::find_match_line_scoped;
 use crate::zotero::db::{
     query_all_annotated_pdfs, query_zotero_child_notes, query_zotero_for_pdf,
-    resolve_pdf_in_zotero,
 };
 use crate::zotero::types::{ZoteroAnnotation, ZoteroChildNote};
 
@@ -39,14 +38,11 @@ pub fn sync_single_entry(
     pdf_stem: &str,
     companion_path: &Path,
     db_path: &str,
+    att_id: i64,
+    parent_id: i64,
     threshold: f64,
     manifest: &ZoteroSyncManifest,
 ) -> Result<(ImportResult, Vec<ZoteroAnnotation>, Vec<ZoteroChildNote>)> {
-    let (att_id, parent_id) = resolve_pdf_in_zotero(db_path, pdf_stem)?
-        .ok_or_else(|| ZolitError::NoZoteroMatch {
-            stem: pdf_stem.to_string(),
-        })?;
-
     let annotations = query_zotero_for_pdf(db_path, att_id)?;
     let child_notes = query_zotero_child_notes(db_path, parent_id)?;
 
@@ -178,7 +174,7 @@ pub fn sync_single_entry(
 
     Ok((
         ImportResult {
-            inserted: inserted + unmatched_count,
+            inserted,
             unmatched: unmatched_count,
             skipped,
         },
@@ -201,25 +197,21 @@ pub fn sync_all(
     let annotated_pdfs = query_all_annotated_pdfs(db_path)?;
     let md_index = scan_md_dir(md_dir);
 
-    let total = annotated_pdfs.len();
+    let mut entries: Vec<_> = annotated_pdfs
+        .iter()
+        .filter(|(stem, _, _)| md_index.contains_key(&stem.to_lowercase()))
+        .filter(|(stem, _, _)| {
+            filter
+                .map(|pat| stem.to_lowercase().contains(&pat.to_lowercase()))
+                .unwrap_or(true)
+        })
+        .collect();
+
+    let total = entries.len();
     let mut idx = 0usize;
 
-    for (pdf_stem, _att_id, _parent_id) in &annotated_pdfs {
-        let companion = match md_index.get(&pdf_stem.to_lowercase()) {
-            Some(path) => path.clone(),
-            None => {
-                tracing::debug!(stem = %pdf_stem, "no companion markdown found, skipping");
-                continue;
-            }
-        };
-
-        if let Some(pat) = filter {
-            let stem_lower = pdf_stem.to_lowercase();
-            let pat_lower = pat.to_lowercase();
-            if !stem_lower.contains(&pat_lower) {
-                continue;
-            }
-        }
+    for (pdf_stem, att_id, parent_id) in entries.drain(..) {
+        let companion = md_index.get(&pdf_stem.to_lowercase()).unwrap().clone();
 
         idx += 1;
         eprint!("\r[{}/{}] Processing {}...", idx, total, pdf_stem);
@@ -243,7 +235,7 @@ pub fn sync_all(
             companion.clone()
         };
 
-        match sync_single_entry(pdf_stem, &target_path, db_path, threshold, &manifest) {
+        match sync_single_entry(pdf_stem, &target_path, db_path, *att_id, *parent_id, threshold, &manifest) {
             Ok((import_result, anns, notes)) => {
                 result.entries_processed += 1;
                 result.total_inserted += import_result.inserted;
@@ -293,10 +285,13 @@ mod tests {
 
         let manifest = ZoteroSyncManifest::default();
         let companion = md_dir.path().join("Smith2024_Deep_Learning.md");
+        // att_id=200, parent_id=100 from test DB
         let (result, _anns, _notes) = sync_single_entry(
             "Smith2024_Deep_Learning",
             &companion,
             &db_path,
+            200,
+            100,
             0.4,
             &manifest,
         )
@@ -325,6 +320,8 @@ mod tests {
             "Smith2024_Deep_Learning",
             &companion,
             &db_path,
+            200,
+            100,
             0.4,
             &manifest,
         )
@@ -337,6 +334,8 @@ mod tests {
             "Smith2024_Deep_Learning",
             &companion,
             &db_path,
+            200,
+            100,
             0.4,
             &manifest2,
         )
@@ -345,24 +344,5 @@ mod tests {
         assert!(result1.inserted > 0, "first sync should insert");
         assert_eq!(result2.inserted, 0, "second sync should skip all (dedup)");
         assert!(result2.skipped > 0, "second sync should report skipped");
-    }
-
-    #[test]
-    fn sync_no_zotero_match() {
-        let (_db_dir, db_path) = create_test_db();
-        let md_dir = tempfile::TempDir::new().unwrap();
-
-        let companion = md_dir.path().join("NonexistentPaper.md");
-        std::fs::write(&companion, "# Nothing").unwrap();
-
-        let manifest = ZoteroSyncManifest::default();
-        let err = sync_single_entry(
-            "NonexistentPaper",
-            &companion,
-            &db_path,
-            0.4,
-            &manifest,
-        );
-        assert!(err.is_err());
     }
 }
