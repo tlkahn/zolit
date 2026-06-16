@@ -71,7 +71,7 @@ pub fn query_zotero_for_pdf(
               AND ia.type NOT IN (3, 4)
             ORDER BY ia.sortIndex ASC",
         )
-        .map_err(|e| ZolitError::DbQuery(e))?;
+        .map_err(ZolitError::DbQuery)?;
 
     let rows = stmt
         .query_map(params![att_item_id], |row| {
@@ -85,11 +85,11 @@ pub fn query_zotero_for_pdf(
                 sort_index: row.get(6)?,
             })
         })
-        .map_err(|e| ZolitError::DbQuery(e))?;
+        .map_err(ZolitError::DbQuery)?;
 
     let mut annotations = Vec::new();
     for row in rows {
-        annotations.push(row.map_err(|e| ZolitError::DbQuery(e))?);
+        annotations.push(row.map_err(ZolitError::DbQuery)?);
     }
     Ok(annotations)
 }
@@ -123,19 +123,19 @@ pub fn resolve_pdf_in_zotero(
               )
             LIMIT 1",
         )
-        .map_err(|e| ZolitError::DbQuery(e))?;
+        .map_err(ZolitError::DbQuery)?;
 
     let mut rows = stmt
         .query(params![filename_with_ext])
-        .map_err(|e| ZolitError::DbQuery(e))?;
+        .map_err(ZolitError::DbQuery)?;
 
-    while let Some(row) = rows.next().map_err(|e| ZolitError::DbQuery(e))? {
+    while let Some(row) = rows.next().map_err(ZolitError::DbQuery)? {
         let att_id: i64 = row
             .get(0)
-            .map_err(|e| ZolitError::DbQuery(e))?;
+            .map_err(ZolitError::DbQuery)?;
         let parent_id: Option<i64> = row
             .get(1)
-            .map_err(|e| ZolitError::DbQuery(e))?;
+            .map_err(ZolitError::DbQuery)?;
         if let Some(pid) = parent_id {
             return Ok(Some((att_id, pid)));
         }
@@ -164,7 +164,7 @@ pub fn query_zotero_child_notes(
               AND i.itemTypeID = (SELECT itemTypeID FROM itemTypes WHERE typeName = 'note')
             ORDER BY n.itemID ASC",
         )
-        .map_err(|e| ZolitError::DbQuery(e))?;
+        .map_err(ZolitError::DbQuery)?;
 
     let rows = stmt
         .query_map(params![parent_item_id], |row| {
@@ -178,11 +178,11 @@ pub fn query_zotero_child_notes(
                 title,
             })
         })
-        .map_err(|e| ZolitError::DbQuery(e))?;
+        .map_err(ZolitError::DbQuery)?;
 
     let mut notes = Vec::new();
     for row in rows {
-        notes.push(row.map_err(|e| ZolitError::DbQuery(e))?);
+        notes.push(row.map_err(ZolitError::DbQuery)?);
     }
     Ok(notes)
 }
@@ -210,7 +210,7 @@ pub fn query_all_annotated_pdfs(
             GROUP BY att.itemID
             ORDER BY att.itemID ASC",
         )
-        .map_err(|e| ZolitError::DbQuery(e))?;
+        .map_err(ZolitError::DbQuery)?;
 
     let rows = stmt
         .query_map([], |row| {
@@ -219,11 +219,11 @@ pub fn query_all_annotated_pdfs(
             let parent_id: i64 = row.get(2)?;
             Ok((path, att_id, parent_id))
         })
-        .map_err(|e| ZolitError::DbQuery(e))?;
+        .map_err(ZolitError::DbQuery)?;
 
     let mut results = Vec::new();
     for row in rows {
-        let (path, att_id, parent_id) = row.map_err(|e| ZolitError::DbQuery(e))?;
+        let (path, att_id, parent_id) = row.map_err(ZolitError::DbQuery)?;
 
         // Extract filename stem from "storage:Foo.pdf" or "/path/to/Foo.pdf"
         let filename = if let Some(stripped) = path.strip_prefix("storage:") {

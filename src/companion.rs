@@ -2,12 +2,14 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
+/// Scan a directory for .md files and build a lowercase-stem → path index.
 pub fn scan_md_dir(md_dir: &Path) -> HashMap<String, PathBuf> {
     let mut index = HashMap::new();
     for entry in WalkDir::new(md_dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
         if path.extension().and_then(|e| e.to_str()) == Some("md") {
             if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                // Use lowercase stem as key, store the full path
                 index
                     .entry(stem.to_lowercase())
                     .or_insert_with(|| path.to_path_buf());
@@ -17,6 +19,8 @@ pub fn scan_md_dir(md_dir: &Path) -> HashMap<String, PathBuf> {
     index
 }
 
+/// Find the companion markdown file for a PDF stem.
+/// Tries case-insensitive stem matching.
 pub fn find_companion(pdf_stem: &str, md_dir: &Path) -> Option<PathBuf> {
     let index = scan_md_dir(md_dir);
     index.get(&pdf_stem.to_lowercase()).cloned()

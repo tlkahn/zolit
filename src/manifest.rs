@@ -74,7 +74,7 @@ pub fn update_manifest_entry(
     let entry = manifest
         .entries
         .entry(entry_key.to_string())
-        .or_insert_with(SyncEntryState::default);
+        .or_default();
 
     let mut id_set: HashSet<String> = entry.imported_ids.iter().cloned().collect();
     for ann in annotations {
