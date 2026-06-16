@@ -9,6 +9,8 @@ use crate::matching::normalize::{normalize, ocr_normalize};
 use crate::matching::page_scope::{
     build_paragraphs_ocr, page_scoped_line_range, PageRange,
 };
+#[cfg(test)]
+use crate::matching::page_scope::find_page_ranges;
 
 /// Find the line index where `needle` best matches within `lines`.
 /// Tries exact substring match first, then single-paragraph fuzzy,

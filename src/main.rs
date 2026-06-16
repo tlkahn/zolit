@@ -1,4 +1,5 @@
 use clap::Parser;
+use colored::Colorize;
 use zolit::cli::{Cli, Command};
 use zolit::{companion, error, manifest, pipeline, zotero};
 use tracing_subscriber::EnvFilter;
@@ -26,7 +27,7 @@ fn main() {
     };
 
     if let Err(e) = result {
-        eprintln!("error: {e}");
+        eprintln!("{} {e}", "error:".red().bold());
         std::process::exit(1);
     }
 }
@@ -50,24 +51,40 @@ fn cmd_sync(cli: &Cli) -> error::Result<()> {
     let db_path = resolve_db_path(cli)?;
     let md_dir = resolve_md_dir(cli)?;
 
-    let result = pipeline::sync_all(&db_path, &md_dir, cli.threshold, cli.dry_run)?;
+    let result = pipeline::sync_all(
+        &db_path,
+        &md_dir,
+        cli.threshold,
+        cli.dry_run,
+        cli.filter.as_deref(),
+        cli.output_dir.as_deref(),
+    )?;
 
     if cli.dry_run {
-        println!("Dry run: {} entries would be processed", result.entries_processed);
+        println!(
+            "{} {} entries would be processed",
+            "[dry run]".yellow().bold(),
+            result.entries_processed
+        );
     } else {
         println!(
-            "Synced: {} entries processed, {} annotations inserted, {} unmatched, {} skipped",
+            "{} {} entries processed, {} inserted, {} unmatched, {} skipped",
+            "done:".green().bold(),
             result.entries_processed,
-            result.total_inserted,
-            result.total_unmatched,
+            result.total_inserted.to_string().green(),
+            if result.total_unmatched > 0 {
+                result.total_unmatched.to_string().yellow()
+            } else {
+                result.total_unmatched.to_string().normal()
+            },
             result.total_skipped,
         );
     }
 
     if !result.errors.is_empty() {
-        eprintln!("\nErrors:");
+        eprintln!("\n{}:", "Errors".red().bold());
         for (stem, err) in &result.errors {
-            eprintln!("  {}: {}", stem, err);
+            eprintln!("  {}: {}", stem.yellow(), err);
         }
     }
 
@@ -84,12 +101,20 @@ fn cmd_list(cli: &Cli) -> error::Result<()> {
         return Ok(());
     }
 
-    println!("{:<50} {:>6} {:>6}", "PDF", "AnnID", "ParID");
-    println!("{}", "-".repeat(66));
+    println!(
+        "{:<50} {:>8} {:>8}",
+        "PDF".bold(),
+        "AttID".bold(),
+        "ParID".bold()
+    );
+    println!("{}", "-".repeat(70));
     for (stem, att_id, parent_id) in &pdfs {
-        println!("{:<50} {:>6} {:>6}", stem, att_id, parent_id);
+        println!("{:<50} {:>8} {:>8}", stem, att_id, parent_id);
     }
-    println!("\n{} annotated PDFs found.", pdfs.len());
+    println!(
+        "\n{} annotated PDFs found.",
+        pdfs.len().to_string().green().bold()
+    );
 
     Ok(())
 }
@@ -100,17 +125,17 @@ fn cmd_status(cli: &Cli) -> error::Result<()> {
 
     let pdfs = zotero::db::query_all_annotated_pdfs(&db_path)?;
     let md_index = companion::scan_md_dir(&md_dir);
-    let manifest = manifest::read_manifest(&md_dir);
+    let manifest_data = manifest::read_manifest(&md_dir);
 
     let mut matched = 0usize;
-    let mut unmatched = 0usize;
+    let mut unmatched_count = 0usize;
     let mut pending_annotations = 0usize;
 
     for (stem, att_id, _parent_id) in &pdfs {
         if md_index.contains_key(&stem.to_lowercase()) {
             matched += 1;
             let anns = zotero::db::query_zotero_for_pdf(&db_path, *att_id)?;
-            let manifest_ids: std::collections::HashSet<String> = manifest
+            let manifest_ids: std::collections::HashSet<String> = manifest_data
                 .entries
                 .get(stem)
                 .map(|e| e.imported_ids.iter().cloned().collect())
@@ -121,20 +146,40 @@ fn cmd_status(cli: &Cli) -> error::Result<()> {
                 .count();
             pending_annotations += pending;
         } else {
-            unmatched += 1;
+            unmatched_count += 1;
         }
     }
 
-    println!("Zotero: {} annotated PDFs", pdfs.len());
-    println!("Matched to markdown: {}", matched);
-    println!("No companion found: {}", unmatched);
-    println!("Annotations pending: {}", pending_annotations);
-
-    if manifest.last_import.is_some() {
+    println!(
+        "Zotero: {} annotated PDFs",
+        pdfs.len().to_string().bold()
+    );
+    println!(
+        "Matched to markdown: {}",
+        matched.to_string().green()
+    );
+    if unmatched_count > 0 {
         println!(
-            "Last sync: {}",
-            manifest.last_import.as_deref().unwrap_or("never")
+            "No companion found: {}",
+            unmatched_count.to_string().yellow()
         );
+    } else {
+        println!("No companion found: 0");
+    }
+    if pending_annotations > 0 {
+        println!(
+            "Annotations pending: {}",
+            pending_annotations.to_string().yellow().bold()
+        );
+    } else {
+        println!(
+            "Annotations pending: {}",
+            "0".green()
+        );
+    }
+
+    if let Some(ref last) = manifest_data.last_import {
+        println!("Last sync: {}", last);
     }
 
     Ok(())
