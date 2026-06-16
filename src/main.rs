@@ -1,8 +1,11 @@
 mod cli;
+mod companion;
 mod dsl;
 mod error;
 mod html;
+mod manifest;
 mod matching;
+mod pipeline;
 mod zotero;
 
 use clap::Parser;
