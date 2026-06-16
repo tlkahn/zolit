@@ -52,7 +52,7 @@ fn sync_all_inserts_and_dedup() {
     )
     .unwrap();
 
-    let result1 = sync_all(&db_path, md_dir.path(), 0.4, false).unwrap();
+    let result1 = sync_all(&db_path, md_dir.path(), 0.4, false, None, None).unwrap();
     assert!(
         result1.total_inserted > 0,
         "first sync should insert annotations"
@@ -63,7 +63,7 @@ fn sync_all_inserts_and_dedup() {
         std::fs::read_to_string(md_dir.path().join("Smith2024_Deep_Learning.md")).unwrap();
     assert!(output.contains("zot-"), "output should contain annotation IDs");
 
-    let result2 = sync_all(&db_path, md_dir.path(), 0.4, false).unwrap();
+    let result2 = sync_all(&db_path, md_dir.path(), 0.4, false, None, None).unwrap();
     assert_eq!(
         result2.total_inserted, 0,
         "second sync should not insert duplicates"
@@ -79,7 +79,7 @@ fn sync_dry_run_does_not_modify() {
     let md_path = md_dir.path().join("Smith2024_Deep_Learning.md");
     std::fs::write(&md_path, md_content).unwrap();
 
-    let result = sync_all(&db_path, md_dir.path(), 0.4, true).unwrap();
+    let result = sync_all(&db_path, md_dir.path(), 0.4, true, None, None).unwrap();
     assert_eq!(result.entries_processed, 1);
 
     let output = std::fs::read_to_string(&md_path).unwrap();
@@ -95,7 +95,7 @@ fn sync_no_companion_skips_gracefully() {
     let (_db_dir, db_path) = create_test_db();
     let md_dir = tempfile::TempDir::new().unwrap();
 
-    let result = sync_all(&db_path, md_dir.path(), 0.4, false).unwrap();
+    let result = sync_all(&db_path, md_dir.path(), 0.4, false, None, None).unwrap();
     assert_eq!(result.entries_processed, 0);
     assert!(result.errors.is_empty());
 }

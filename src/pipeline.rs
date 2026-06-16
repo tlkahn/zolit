@@ -192,12 +192,17 @@ pub fn sync_all(
     md_dir: &Path,
     threshold: f64,
     dry_run: bool,
+    filter: Option<&str>,
+    output_dir: Option<&Path>,
 ) -> Result<BatchImportResult> {
     let mut manifest = read_manifest(md_dir);
     let mut result = BatchImportResult::default();
 
     let annotated_pdfs = query_all_annotated_pdfs(db_path)?;
     let md_index = scan_md_dir(md_dir);
+
+    let total = annotated_pdfs.len();
+    let mut idx = 0usize;
 
     for (pdf_stem, _att_id, _parent_id) in &annotated_pdfs {
         let companion = match md_index.get(&pdf_stem.to_lowercase()) {
@@ -208,13 +213,37 @@ pub fn sync_all(
             }
         };
 
+        if let Some(pat) = filter {
+            let stem_lower = pdf_stem.to_lowercase();
+            let pat_lower = pat.to_lowercase();
+            if !stem_lower.contains(&pat_lower) {
+                continue;
+            }
+        }
+
+        idx += 1;
+        eprint!("\r[{}/{}] Processing {}...", idx, total, pdf_stem);
+
         if dry_run {
             result.entries_processed += 1;
-            tracing::info!(stem = %pdf_stem, companion = %companion.display(), "would sync");
+            eprintln!(" (dry run)");
             continue;
         }
 
-        match sync_single_entry(pdf_stem, &companion, db_path, threshold, &manifest) {
+        let target_path = if let Some(out) = output_dir {
+            let dest = out.join(companion.file_name().unwrap_or_default());
+            if !dest.exists() {
+                std::fs::copy(&companion, &dest).map_err(|e| ZolitError::Io {
+                    source: e,
+                    path: dest.clone(),
+                })?;
+            }
+            dest
+        } else {
+            companion.clone()
+        };
+
+        match sync_single_entry(pdf_stem, &target_path, db_path, threshold, &manifest) {
             Ok((import_result, anns, notes)) => {
                 result.entries_processed += 1;
                 result.total_inserted += import_result.inserted;
@@ -227,6 +256,10 @@ pub fn sync_all(
                 result.errors.push((pdf_stem.clone(), e.to_string()));
             }
         }
+    }
+
+    if idx > 0 {
+        eprintln!();
     }
 
     if !dry_run {
