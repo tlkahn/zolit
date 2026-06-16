@@ -249,11 +249,11 @@ pub fn query_all_annotated_pdfs(
 // ===========================================================================
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use rusqlite::Connection;
 
-    fn create_test_db() -> (tempfile::TempDir, String) {
+    pub(crate) fn create_test_db() -> (tempfile::TempDir, String) {
         let dir = tempfile::TempDir::new().unwrap();
         let db_path = dir.path().join("zotero.sqlite");
         let path_str = db_path.to_str().unwrap().to_string();
