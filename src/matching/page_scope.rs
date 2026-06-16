@@ -85,20 +85,22 @@ pub fn page_scoped_line_range(
 /// word ends with hyphen-space and the next token starts lowercase) are
 /// collapsed to "knowledge".
 pub(crate) fn rejoin_paragraph_hyphens(text: &str) -> String {
-    let bytes = text.as_bytes();
+    let chars: Vec<char> = text.chars().collect();
     let mut result = String::with_capacity(text.len());
     let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'-' {
+    while i < chars.len() {
+        if chars[i] == '-' {
             // Check: hyphen followed by space, then lowercase ASCII letter
-            if i + 2 < bytes.len() && bytes[i + 1] == b' ' && bytes[i + 2].is_ascii_lowercase()
+            if i + 2 < chars.len()
+                && chars[i + 1] == ' '
+                && chars[i + 2].is_ascii_lowercase()
             {
                 // Skip the hyphen and space, continue with the lowercase letter
                 i += 2;
                 continue;
             }
         }
-        result.push(bytes[i] as char);
+        result.push(chars[i]);
         i += 1;
     }
     result
@@ -274,5 +276,12 @@ mod tests {
     #[test]
     fn test_page_scoped_range_empty_ranges() {
         assert_eq!(page_scoped_line_range("1", &[]), None);
+    }
+
+    #[test]
+    fn test_rejoin_paragraph_hyphens_preserves_non_ascii() {
+        assert_eq!(rejoin_paragraph_hyphens("über- schrift"), "überschrift");
+        assert_eq!(rejoin_paragraph_hyphens("café"), "café");
+        assert_eq!(rejoin_paragraph_hyphens("日本語テキスト"), "日本語テキスト");
     }
 }

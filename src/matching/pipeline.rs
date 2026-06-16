@@ -35,28 +35,6 @@ pub fn find_match_line(needle: &str, lines: &[&str], threshold: f64) -> Option<u
     find_fuzzy_match_windowed(needle, &paragraphs, threshold)
 }
 
-/// Like `find_match_line` but builds paragraphs with hyphen-rejoin.
-/// Used by `find_match_line_scoped` after OCR normalization.
-fn find_match_line_ocr(needle: &str, lines: &[&str], threshold: f64) -> Option<usize> {
-    // Try exact + standard fuzzy first (reuse find_match_line)
-    if let Some(line_idx) = find_match_line(needle, lines, threshold) {
-        return Some(line_idx);
-    }
-
-    // Fall back to OCR-enhanced paragraph matching with hyphen-rejoin.
-    // This catches cases where line-break hyphenation splits a word
-    // across lines (e.g. "knowl-" + "edge" -> "knowledge").
-    let norm_needle = normalize(needle);
-    if norm_needle.is_empty() {
-        return None;
-    }
-    let paragraphs = build_paragraphs_ocr(lines);
-    if let Some(line_idx) = find_fuzzy_match(needle, &paragraphs, threshold) {
-        return Some(line_idx);
-    }
-    find_fuzzy_match_windowed(needle, &paragraphs, threshold)
-}
-
 /// Metadata about how a match was found, used by the preview command.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MatchMetadata {
@@ -80,36 +58,8 @@ pub fn find_match_line_scoped(
     page_label: Option<&str>,
     page_ranges: &[PageRange],
 ) -> Option<usize> {
-    let ocr_needle = ocr_normalize(needle);
-    if ocr_needle.is_empty() {
-        return None;
-    }
-
-    // Pre-normalize all lines once. We apply ocr_normalize per-line
-    // for ligatures/quotes/dashes, but line-break hyphenation is handled
-    // at the paragraph level by rejoin_paragraph_hyphens in build_paragraphs_ocr.
-    let ocr_lines: Vec<String> = lines.iter().map(|l| ocr_normalize(l)).collect();
-    let ocr_line_refs: Vec<&str> = ocr_lines.iter().map(|s| s.as_str()).collect();
-
-    // Determine page scope
-    let scope = page_label.and_then(|pl| page_scoped_line_range(pl, page_ranges));
-
-    // Try scoped search first
-    if let Some((start, end)) = scope {
-        let end = end.min(ocr_line_refs.len().saturating_sub(1));
-        if start <= end {
-            let scoped_lines = &ocr_line_refs[start..=end];
-
-            if let Some(local_idx) =
-                find_match_line_ocr(&ocr_needle, scoped_lines, threshold)
-            {
-                return Some(start + local_idx); // Convert back to global line index
-            }
-        }
-    }
-
-    // Fall back to full-document search
-    find_match_line_ocr(&ocr_needle, &ocr_line_refs, threshold)
+    find_match_line_scoped_with_metadata(needle, lines, threshold, page_label, page_ranges)
+        .map(|m| m.line_idx)
 }
 
 /// Like `find_match_line_scoped` but returns rich metadata about the match.

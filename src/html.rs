@@ -164,10 +164,10 @@ pub fn html_to_markdown(html: &str) -> String {
         .to_string();
 
     // Bold: <strong>/<b>
-    s = lazy_regex!(r"(?is)<(?:strong|b)>(.*?)</(?:strong|b)>").replace_all(&s, "**$1**").to_string();
+    s = lazy_regex!(r"(?is)<(?:strong|b)[^>]*>(.*?)</(?:strong|b)>").replace_all(&s, "**$1**").to_string();
 
     // Italic: <em>/<i>
-    s = lazy_regex!(r"(?is)<(?:em|i)>(.*?)</(?:em|i)>").replace_all(&s, "*$1*").to_string();
+    s = lazy_regex!(r"(?is)<(?:em|i)[^>]*>(.*?)</(?:em|i)>").replace_all(&s, "*$1*").to_string();
 
     // Code: <code>
     s = lazy_regex!(r"(?is)<code>(.*?)</code>").replace_all(&s, "`$1`").to_string();
