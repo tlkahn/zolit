@@ -51,6 +51,9 @@ pub fn zotero_ann_to_dsl(ann: &ZoteroAnnotation) -> String {
         _ => page_prefix,
     };
 
+    // Escape closing delimiter so body content cannot prematurely close the DSL block
+    let body = body.replace("--->", "--- >");
+
     // Build scope anchor
     let anchor = ann
         .text
@@ -87,6 +90,9 @@ pub fn zotero_note_to_dsl(note: &ZoteroChildNote) -> String {
         Some(t) if !t.is_empty() => format!("{}: {}", t, note.html_content),
         _ => note.html_content.clone(),
     };
+
+    // Escape closing delimiter so body content cannot prematurely close the DSL block
+    let body = body.replace("--->", "--- >");
 
     let compact = format!("<!---[{}] n: | {} --->", uuid, body);
 

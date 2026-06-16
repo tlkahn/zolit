@@ -67,7 +67,7 @@ pub(crate) fn lcs_length(a: &str, b: &str) -> usize {
 ///
 /// Returns the maximum of the two scores.
 pub fn fuzzy_score(a: &str, b: &str) -> f64 {
-    let max_len = a.len().max(b.len());
+    let max_len = a.chars().count().max(b.chars().count());
     if max_len == 0 {
         return 1.0; // both empty
     }
@@ -84,30 +84,7 @@ pub fn find_fuzzy_match(
     paragraphs: &[(String, usize)],
     threshold: f64,
 ) -> Option<usize> {
-    let norm_needle = normalize(needle);
-    if norm_needle.is_empty() {
-        return None;
-    }
-
-    let mut best_score: f64 = 0.0;
-    let mut best_line: Option<usize> = None;
-
-    for (para_text, last_line) in paragraphs {
-        if para_text.is_empty() {
-            continue;
-        }
-        let score = fuzzy_score(&norm_needle, para_text);
-        if score > best_score {
-            best_score = score;
-            best_line = Some(*last_line);
-        }
-    }
-
-    if best_score >= threshold {
-        best_line
-    } else {
-        None
-    }
+    find_fuzzy_match_with_score(needle, paragraphs, threshold).map(|(line, _)| line)
 }
 
 /// Try windows of 2 and 3 consecutive paragraphs.
@@ -122,38 +99,7 @@ pub fn find_fuzzy_match_windowed(
     paragraphs: &[(String, usize)],
     threshold: f64,
 ) -> Option<usize> {
-    let norm_needle = normalize(needle);
-    if norm_needle.is_empty() || paragraphs.len() < 2 {
-        return None;
-    }
-
-    let mut best_score: f64 = 0.0;
-    let mut best_line: Option<usize> = None;
-
-    let max_window = 3.min(paragraphs.len());
-    for window_size in 2..=max_window {
-        for start in 0..=(paragraphs.len() - window_size) {
-            let end = start + window_size - 1;
-            let joined: String = paragraphs[start..=end]
-                .iter()
-                .map(|(t, _)| t.as_str())
-                .collect::<Vec<_>>()
-                .join(" ");
-
-            let score = fuzzy_score(&norm_needle, &joined);
-
-            if score > best_score {
-                best_score = score;
-                best_line = Some(paragraphs[end].1);
-            }
-        }
-    }
-
-    if best_score >= threshold {
-        best_line
-    } else {
-        None
-    }
+    find_fuzzy_match_windowed_with_score(needle, paragraphs, threshold).map(|(line, _)| line)
 }
 
 /// Like `find_fuzzy_match` but also returns the score.
@@ -548,5 +494,12 @@ mod tests {
             0.65,
         );
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_fuzzy_score_cjk() {
+        // 4 chars match out of 7 chars = 0.571, not 4/21=0.19
+        let score = fuzzy_score("深度学习", "深度学习方法论");
+        assert!(score > 0.5, "CJK fuzzy score should be char-based, got {}", score);
     }
 }

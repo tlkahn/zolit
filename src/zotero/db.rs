@@ -6,13 +6,13 @@ use crate::html::html_to_markdown;
 
 pub(crate) fn encode_sqlite_uri_path(path: &str) -> String {
     let mut encoded = String::with_capacity(path.len() * 2);
-    for b in path.bytes() {
-        match b {
-            b'%' => encoded.push_str("%25"),
-            b'#' => encoded.push_str("%23"),
-            b'?' => encoded.push_str("%3F"),
-            b' ' => encoded.push_str("%20"),
-            _ => encoded.push(b as char),
+    for c in path.chars() {
+        match c {
+            '%' => encoded.push_str("%25"),
+            '#' => encoded.push_str("%23"),
+            '?' => encoded.push_str("%3F"),
+            ' ' => encoded.push_str("%20"),
+            _ => encoded.push(c),
         }
     }
     encoded
@@ -27,9 +27,20 @@ pub(crate) fn open_zotero_db(db_path: &str) -> Result<Connection, ZolitError> {
         format!("file:{}?mode=ro", uri_path),
         OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_URI,
     )
-    .map_err(|e| ZolitError::DbOpen {
-        path: db_path.to_string(),
-        source: e,
+    .map_err(|e| {
+        let msg = e.to_string();
+        if msg.contains("database is locked") || msg.contains("SQLITE_BUSY") {
+            ZolitError::Other(format!(
+                "Zotero database at {} is locked — is Zotero running? \
+                 Close Zotero or try again in a moment. ({})",
+                db_path, e
+            ))
+        } else {
+            ZolitError::DbOpen {
+                path: db_path.to_string(),
+                source: e,
+            }
+        }
     })
 }
 
@@ -221,11 +232,12 @@ pub fn query_all_annotated_pdfs(
             path.rsplit('/').next().unwrap_or(&path).to_string()
         };
 
-        let stem = filename
-            .strip_suffix(".pdf")
-            .or_else(|| filename.strip_suffix(".PDF"))
-            .unwrap_or(&filename)
-            .to_string();
+        let stem = if filename.to_ascii_lowercase().ends_with(".pdf") {
+            &filename[..filename.len() - 4]
+        } else {
+            &filename
+        }
+        .to_string();
 
         results.push((stem, att_id, parent_id));
     }
@@ -664,6 +676,14 @@ mod tests {
         assert_eq!(
             encode_sqlite_uri_path("/a b/c#d/e?f/100%"),
             "/a%20b/c%23d/e%3Ff/100%25"
+        );
+    }
+
+    #[test]
+    fn test_encode_sqlite_uri_path_non_ascii() {
+        assert_eq!(
+            encode_sqlite_uri_path("/home/user/Référence/zotero.sqlite"),
+            "/home/user/Référence/zotero.sqlite"
         );
     }
 
